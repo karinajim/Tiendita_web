@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config>
+        <domain includeSubdomains="true">gestopago.portalventas.net</domain>
+        <pin-set expiration="2027-12-31">
+            <!-- Huella SHA-256 convertida a Base64 -->
+            <pin digest="SHA-256">x5XXfKACZ7qpyFgCSxWfNbuv6EVcwrJsLJycSvxB7J4=</pin>
+        </pin-set>
+    </domain-config>
+</network-security-config>
