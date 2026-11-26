@@ -30,7 +30,11 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+
+# IGNORAR TODO BUILD EXCEPTO LA CARPETA WEB
+/build/*
+!/build/web/
+
 /coverage/
 .env
 
