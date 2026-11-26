@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart'; 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:xml/xml.dart';
 import '../model/usuario.dart';
 import '../model/rol.dart';
 import '../model/producto.dart';
@@ -13,6 +15,9 @@ class DatabaseHelper {
 
   static Database? _database;
 
+  // Variable para guardar los productos en memoria cuando estamos en Web
+  static List<ProductoXML>? _productosWebCache;
+
   Future<Database> get database async {
     if (kIsWeb) throw UnsupportedError('SQLite no soportado en Web');
     if (_database != null) return _database!;
@@ -22,14 +27,10 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     String path = join(await getDatabasesPath(), 'mi_app.db');
-    return await openDatabase(
-      path,
-      version: 8,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    return await openDatabase(path, version: 8, onCreate: _onCreate, onUpgrade: _onUpgrade);
   }
 
+  // ... (Deja tus métodos _onCreate y _onUpgrade intactos como los tenías) ...
   Future<void> _onCreate(Database db, int version) async {
       await db.execute("CREATE TABLE rol_permiso (id INTEGER PRIMARY KEY, rol TEXT NOT NULL)");
       await db.execute("CREATE TABLE user_app(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, nombre TEXT NOT NULL, desc TEXT, pass TEXT NOT NULL, correo TEXT NOT NULL, role_id INTEGER NOT NULL, token_recuperacion TEXT, token_expiracion TIMESTAMP, codigo_verificacion TEXT, codigo_expiracion TIMESTAMP, createdAT TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, latitud REAL, longitud REAL)");
@@ -246,13 +247,49 @@ class DatabaseHelper {
     return results.length;
   }
 
+  // 🔥 AQUÍ ESTÁ LA MAGIA PARA MOSTRAR LOS 903 PRODUCTOS EN LA WEB 🔥
   Future<List<ProductoXML>> obtenerProductosXML() async {
     if (kIsWeb) {
-      // Devolvemos algunos productos de prueba (quitado el $ para evitar errores)
-      return [
-        ProductoXML(idProducto: 1, idServicio: 1, servicio: 'Telcel', producto: 'Recarga Telcel de 50', precio: 50.0, tipoFront: 1, idCatTipoServicio: 1, hasDigitoVerificador: false, showAyuda: false, tipoReferencia: '', legend: ''),
-        ProductoXML(idProducto: 2, idServicio: 2, servicio: 'CFE', producto: 'Pago CFE', precio: 100.0, tipoFront: 2, idCatTipoServicio: 2, hasDigitoVerificador: false, showAyuda: false, tipoReferencia: '', legend: ''),
-      ];
+      if (_productosWebCache != null) return _productosWebCache!;
+      
+      try {
+        // Lee el archivo XML de tus assets
+        final xmlString = await rootBundle.loadString('assets/productos.xml');
+        final document = XmlDocument.parse(xmlString);
+        final root = document.rootElement;
+        final productosElement = root.findElements('PRODUCTOS').firstOrNull;
+        
+        if (productosElement == null) return [];
+
+        final List<ProductoXML> listaWeb = [];
+        for (final elemento in productosElement.findElements('producto')) {
+          try {
+            final servicio = elemento.getAttribute('servicio') ?? '';
+            final producto = elemento.getAttribute('producto') ?? '';
+            final idServicio = int.tryParse(elemento.getAttribute('idServicio') ?? '0') ?? 0;
+            final idProducto = int.tryParse(elemento.getAttribute('idProducto') ?? '0') ?? 0;
+            final idCatTipoServicio = int.tryParse(elemento.getAttribute('idCatTipoServicio') ?? '0') ?? 0;
+            final tipoFront = int.tryParse(elemento.getAttribute('tipoFront') ?? '0') ?? 0;
+            final hasDigitoVerificador = elemento.getAttribute('hasDigitoVerificador') == 'true';
+            final precio = double.tryParse(elemento.getAttribute('precio') ?? '0') ?? 0.0;
+            final showAyuda = elemento.getAttribute('showAyuda') == 'true';
+            final tipoReferencia = elemento.getAttribute('tipoReferencia') ?? '';
+            final legend = elemento.findElements('legend').firstOrNull?.innerText.trim() ?? '';
+
+            listaWeb.add(ProductoXML(
+              servicio: servicio, producto: producto, idServicio: idServicio, idProducto: idProducto,
+              idCatTipoServicio: idCatTipoServicio, tipoFront: tipoFront, hasDigitoVerificador: hasDigitoVerificador,
+              precio: precio, showAyuda: showAyuda, tipoReferencia: tipoReferencia, legend: legend,
+            ));
+          } catch (e) {
+            // Ignorar producto con error
+          }
+        }
+        _productosWebCache = listaWeb;
+        return listaWeb;
+      } catch (e) {
+        return []; // Si falla, devuelve vacío
+      }
     }
     final db = await database;
     final maps = await db.query('producto_xml', orderBy: 'id_producto ASC');
@@ -262,7 +299,7 @@ class DatabaseHelper {
   Future<List<ProductoXML>> buscarProductosXML(String texto) async {
     if (kIsWeb) {
        final all = await obtenerProductosXML();
-       return all.where((p) => p.producto.toLowerCase().contains(texto.toLowerCase())).toList();
+       return all.where((p) => p.producto.toLowerCase().contains(texto.toLowerCase()) || p.servicio.toLowerCase().contains(texto.toLowerCase())).toList();
     }
     final db = await database;
     final maps = await db.query('producto_xml', where: 'LOWER(producto) LIKE ? OR LOWER(servicio) LIKE ?', whereArgs: ['%${texto.toLowerCase()}%', '%${texto.toLowerCase()}%'], orderBy: 'id_producto ASC');
@@ -270,7 +307,10 @@ class DatabaseHelper {
   }
 
   Future<int> contarProductosXML() async {
-    if (kIsWeb) return 2; 
+    if (kIsWeb) {
+      final lista = await obtenerProductosXML();
+      return lista.length;
+    }
     final db = await database;
     final result = await db.rawQuery('SELECT COUNT(*) FROM producto_xml');
     return Sqflite.firstIntValue(result) ?? 0;
