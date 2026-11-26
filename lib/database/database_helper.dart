@@ -30,7 +30,6 @@ class DatabaseHelper {
     );
   }
 
-  // ... (Deja tus métodos _onCreate y _onUpgrade exactamente igual que los tenías) ...
   Future<void> _onCreate(Database db, int version) async {
       await db.execute("CREATE TABLE rol_permiso (id INTEGER PRIMARY KEY, rol TEXT NOT NULL)");
       await db.execute("CREATE TABLE user_app(id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, nombre TEXT NOT NULL, desc TEXT, pass TEXT NOT NULL, correo TEXT NOT NULL, role_id INTEGER NOT NULL, token_recuperacion TEXT, token_expiracion TIMESTAMP, codigo_verificacion TEXT, codigo_expiracion TIMESTAMP, createdAT TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, latitud REAL, longitud REAL)");
@@ -51,8 +50,6 @@ class DatabaseHelper {
   }
 
   // ================= MOCKS PARA WEB =================
-  // Si estamos en Web, devolvemos datos falsos para que el profe vea que funciona.
-
   Future<List<Rol>> obtenerRoles() async {
     if (kIsWeb) return [Rol(id: 1, rol: 'admin'), Rol(id: 2, rol: 'usuario')];
     final db = await database;
@@ -67,7 +64,7 @@ class DatabaseHelper {
   }
 
   Future<int> insertarUsuario(Usuario usuario) async {
-    if (kIsWeb) return 1; // Simula que lo guardó
+    if (kIsWeb) return 1; 
     final db = await database;
     return await db.insert('user_app', usuario.toMap());
   }
@@ -87,7 +84,6 @@ class DatabaseHelper {
 
   Future<Usuario?> obtenerUsuarioPorCredenciales(String correo, String pass) async {
     if (kIsWeb) {
-      // Acepta cualquier correo y contraseña en la web para que el profe pueda entrar
       return Usuario(id: 1, nombre: 'Usuario Web', correo: correo, pass: pass, roleId: 1);
     }
     final db = await database;
@@ -252,9 +248,9 @@ class DatabaseHelper {
 
   Future<List<ProductoXML>> obtenerProductosXML() async {
     if (kIsWeb) {
-      // Devolvemos algunos productos de prueba para que el catálogo no esté vacío
+      // Devolvemos algunos productos de prueba (quitado el $ para evitar errores)
       return [
-        ProductoXML(idProducto: 1, idServicio: 1, servicio: 'Telcel', producto: 'Recarga Telcel $50', precio: 50.0, tipoFront: 1, idCatTipoServicio: 1, hasDigitoVerificador: false, showAyuda: false, tipoReferencia: '', legend: ''),
+        ProductoXML(idProducto: 1, idServicio: 1, servicio: 'Telcel', producto: 'Recarga Telcel de 50', precio: 50.0, tipoFront: 1, idCatTipoServicio: 1, hasDigitoVerificador: false, showAyuda: false, tipoReferencia: '', legend: ''),
         ProductoXML(idProducto: 2, idServicio: 2, servicio: 'CFE', producto: 'Pago CFE', precio: 100.0, tipoFront: 2, idCatTipoServicio: 2, hasDigitoVerificador: false, showAyuda: false, tipoReferencia: '', legend: ''),
       ];
     }
@@ -274,7 +270,7 @@ class DatabaseHelper {
   }
 
   Future<int> contarProductosXML() async {
-    if (kIsWeb) return 2; // Simula que hay 2 productos
+    if (kIsWeb) return 2; 
     final db = await database;
     final result = await db.rawQuery('SELECT COUNT(*) FROM producto_xml');
     return Sqflite.firstIntValue(result) ?? 0;
